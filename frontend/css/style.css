@@ -1,0 +1,22 @@
+/* ==========================================
+MEDKIT - ESTILOS CUSTOMIZADOS
+Nota: A maior parte do estilo é feita via Tailwind CSS no HTML.
+Estas são classes auxiliares do sistema.
+========================================== */
+
+/*
+Classe utilitária para ocultar telas (Dashboard, Estoque, Modal).
+O !important garante que o Tailwind não sobrescreva essa regra
+quando o JavaScript adicionar essa classe.
+*/
+.hidden-view {
+    display: none !important;
+    }
+    /*
+    Fundo escurecido semi-transparente para dar destaque ao modal
+    (janelinha) de cadastro, edição e exclusão.
+    */
+    .modal-bg {
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(2px); /* Adiciona um leve desfoque no fundo para ficar mais elegante */
+}

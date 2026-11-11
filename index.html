@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedKit - Controle de Estoque Laboratorial</title>
+    <!-- Tailwind CSS para Estilização Rápida e Moderna -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome para Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="frontend/css/style.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        medred: { 500: '#D32F2F', 600: '#B71C1C' }, // Cores baseadas na sua logo
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-gray-50 text-gray-800 antialiased h-screen flex overflow-hidden">
+
+    <!-- ========================================== -->
+    <!-- TELA DE LOGIN                              -->
+    <!-- ========================================== -->
+    <div id="login-view" class="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+        <div class="w-full max-w-md bg-white p-8 rounded-2xl shadow-xl border border-gray-100">
+            <div class="flex justify-center mb-6">
+                <!-- Simulando a logo. Substitua o src pelo caminho real da sua imagem depois -->
+                <div class="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center text-medred-500 text-4xl">
+                    <i class="fa-solid fa-briefcase-medical"></i>
+                </div>
+            </div>
+            <h2 class="text-3xl font-bold text-center text-gray-800 mb-2">MedKit</h2>
+            <p class="text-center text-gray-500 mb-8">Acesso restrito para laboratório</p>
+            
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="crm">CRM / Usuário</label>
+                    <input class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 leading-tight focus:outline-none focus:ring-2 focus:ring-medred-500" id="crm" type="text" placeholder="Digite seu CRM" required>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="password">Senha</label>
+                    <input class="shadow-sm appearance-none border rounded-lg w-full py-3 px-4 text-gray-700 mb-3 leading-tight focus:outline-none focus:ring-2 focus:ring-medred-500" id="password" type="password" placeholder="******************" required>
+                </div>
+                <div id="login-error" class="hidden-view text-red-500 text-sm mb-4 text-center">Usuário ou senha inválidos.</div>
+                <button class="w-full bg-medred-500 hover:bg-medred-600 text-white font-bold py-3 px-4 rounded-lg focus:outline-none focus:shadow-outline transition duration-200" type="submit">
+                    Entrar no Sistema
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- BARRA LATERAL (MENU)                       -->
+    <!-- ========================================== -->
+    <aside id="sidebar" class="hidden-view w-64 bg-white border-r border-gray-200 flex flex-col transition-all duration-300">
+        <div class="p-6 flex items-center gap-3 border-b border-gray-100">
+            <i class="fa-solid fa-briefcase-medical text-medred-500 text-2xl"></i>
+            <span class="text-xl font-bold text-gray-800">MedKit</span>
+        </div>
+        <div class="p-4 flex-1">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-4">Menu Principal</p>
+            <nav class="space-y-2">
+                <button onclick="switchTab('dashboard')" id="btn-dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-medred-600 bg-red-50 font-medium transition">
+                    <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+                </button>
+                <button onclick="switchTab('inventory')" id="btn-inventory" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-100 font-medium transition">
+                    <i class="fa-solid fa-boxes-stacked w-5"></i> Estoque Geral
+                </button>
+                <button class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:bg-gray-100 font-medium transition opacity-50 cursor-not-allowed" title="Em desenvolvimento">
+                    <i class="fa-solid fa-file-contract w-5"></i> Relatórios
+                </button>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                    DR
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-gray-800">Dr. Roberto</p>
+                    <p class="text-xs text-gray-500">Médico Chefe</p>
+                </div>
+            </div>
+            <button onclick="handleLogout()" class="w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left text-red-500 hover:bg-red-50 font-medium transition">
+                <i class="fa-solid fa-right-from-bracket w-5"></i> Sair
+            </button>
+        </div>
+    </aside>
+
+    <!-- ========================================== -->
+    <!-- CONTEÚDO PRINCIPAL                         -->
+    <!-- ========================================== -->
+    <main id="main-content" class="hidden-view flex-1 bg-gray-50 flex flex-col h-full overflow-y-auto">
+        <!-- Header Topo -->
+        <header class="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center sticky top-0 z-10">
+            <h1 id="page-title" class="text-2xl font-bold text-gray-800">Dashboard</h1>
+            <div class="flex items-center gap-4">
+                <button class="relative p-2 text-gray-400 hover:text-gray-600 transition">
+                    <i class="fa-regular fa-bell text-xl"></i>
+                    <span class="absolute top-1 right-1 flex h-3 w-3">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                    </span>
+                </button>
+            </div>
+        </header>
+
+        <div class="p-8">
+            <!-- TELA: DASHBOARD -->
+            <div id="view-dashboard" class="">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <!-- Cards de Resumo -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xl">
+                            <i class="fa-solid fa-pills"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Total de Itens</p>
+                            <p class="text-2xl font-bold text-gray-800" id="dash-total">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4 border-l-4 border-l-yellow-400">
+                        <div class="w-12 h-12 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 text-xl">
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Estoque Baixo</p>
+                            <p class="text-2xl font-bold text-gray-800" id="dash-low">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center gap-4 border-l-4 border-l-red-500">
+                        <div class="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600 text-xl">
+                            <i class="fa-solid fa-calendar-xmark"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500 font-medium">Próximos ao Vencimento</p>
+                            <p class="text-2xl font-bold text-gray-800" id="dash-expiring">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sessão de Alertas -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Itens Requerendo Atenção</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="border-b border-gray-200 text-sm text-gray-500">
+                                    <th class="py-3 px-4">Item</th>
+                                    <th class="py-3 px-4">Motivo</th>
+                                    <th class="py-3 px-4">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alerts-table-body">
+                                <!-- Gerado via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TELA: INVENTÁRIO -->
+            <div id="view-inventory" class="hidden-view">
+                <!-- Barra superior de ações e filtros -->
+                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
+                    
+                    <!-- Bloco de Pesquisa e Filtros -->
+                    <div class="flex flex-wrap gap-2 w-full xl:w-auto">
+                        
+                        <!-- NOVA BARRA DE PESQUISA -->
+                        <div class="relative min-w-[220px] flex-1 sm:flex-none">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                                <i class="fa-solid fa-magnifying-glass text-gray-400"></i>
+                            </div>
+                            <input type="text" id="search-item" oninput="renderInventory()" placeholder="Buscar por nome..." class="border border-gray-300 text-gray-700 py-2 pl-10 pr-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-medred-500 bg-white w-full">
+                        </div>
+
+                        <!-- Filtros -->
+                        <select id="filter-category" onchange="renderInventory()" class="border border-gray-300 text-gray-700 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-medred-500 bg-white flex-1 sm:flex-none">
+                            <option value="all">Todas Categorias</option>
+                            <option value="Medicamento">Medicamentos</option>
+                            <option value="Anestésico">Anestésicos</option>
+                            <option value="Vacina">Vacinas</option>
+                            <option value="Equipamento">Equipamentos</option>
+                        </select>
+                        <select id="filter-status" onchange="renderInventory()" class="border border-gray-300 text-gray-700 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-medred-500 bg-white flex-1 sm:flex-none">
+                            <option value="all">Status: Todos</option>
+                            <option value="low">Estoque Baixo</option>
+                            <option value="expiring">Vencendo</option>
+                            <option value="cooling">Requer Resfriamento</option>
+                        </select>
+                        
+                        <!-- FILTRO DINÂMICO DE SUBCATEGORIA -->
+                        <select id="filter-subcategory" onchange="renderInventory()" class="hidden-view border border-gray-300 text-gray-700 py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-medred-500 bg-white flex-1 sm:flex-none">
+                            <option value="all">Todos os Tipos</option>
+                        </select>
+                    </div>
+
+                    <button onclick="openModal()" class="bg-medred-500 hover:bg-medred-600 text-white font-medium py-2 px-5 rounded-lg shadow-sm transition flex items-center gap-2 whitespace-nowrap">
+                        <i class="fa-solid fa-plus"></i> Novo Item
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 text-gray-500 text-sm">
+                                <tr>
+                                    <th class="py-4 px-6 font-medium">Nome / Princípio Ativo</th>
+                                    <th class="py-4 px-6 font-medium">Categoria / Tipo</th>
+                                    <th class="py-4 px-6 font-medium text-center">Quant.</th>
+                                    <th class="py-4 px-6 font-medium">Validade</th>
+                                    <th class="py-4 px-6 font-medium">Status</th>
+                                    <th class="py-4 px-6 font-medium text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="inventory-table-body" class="divide-y divide-gray-100">
+                                <!-- Preenchido via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- MODAL DE CADASTRO/EDIÇÃO (CRUD)            -->
+    <!-- ========================================== -->
+    <div id="item-modal" class="hidden-view fixed inset-0 modal-bg z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                <h3 class="text-xl font-bold text-gray-800" id="modal-title">Cadastrar Novo Item</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-700 transition">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <form id="item-form" class="p-6" onsubmit="saveItem(event)">
+                <input type="hidden" id="item-id"> <!-- Campo oculto para saber se é edição -->
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Nome do Item *</label>
+                        <input type="text" id="item-name" required class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Categoria *</label>
+                        <select id="item-category" required onchange="updateSubcategories()" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none bg-white">
+                            <option value="Medicamento">Medicamento</option>
+                            <option value="Anestésico">Anestésico</option>
+                            <option value="Vacina">Vacina</option>
+                            <option value="Equipamento">Equipamento</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Quantidade *</label>
+                        <input type="number" id="item-qty" min="0" required class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Data de Validade</label>
+                        <input type="date" id="item-expiration" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-gray-700 text-sm font-bold mb-2">Preço Custo (R$)</label>
+                        <input type="number" step="0.01" id="item-price" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label id="label-item-type" class="block text-gray-700 text-sm font-bold mb-2">Subcategoria (Selecione a Categoria acima primeiro)</label>
+                    <input type="text" id="item-type" list="type-options" placeholder="Selecione na lista ou digite..." class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-medred-500 outline-none bg-white" required>
+                    <datalist id="type-options">
+                        <!-- As opções serão geradas dinamicamente pelo JavaScript ao mudar a categoria -->
+                    </datalist>
+                </div>
+
+                <div class="flex gap-6 mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <label class="flex items-center gap-2 cursor-pointer text-gray-700 font-medium text-sm">
+                        <input type="checkbox" id="item-cooling" class="w-4 h-4 text-medred-600 focus:ring-medred-500 border-gray-300 rounded">
+                        Necessita Resfriamento?
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer text-gray-700 font-medium text-sm">
+                        <input type="checkbox" id="item-generic" class="w-4 h-4 text-medred-600 focus:ring-medred-500 border-gray-300 rounded">
+                        É Genérico?
+                    </label>
+                </div>
+
+                <div class="mt-8 flex justify-end gap-3">
+                    <button type="button" onclick="closeModal()" class="px-5 py-2.5 text-gray-600 bg-gray-200 hover:bg-gray-300 font-medium rounded-lg transition">Cancelar</button>
+                    <button type="submit" class="px-5 py-2.5 text-white bg-medred-500 hover:bg-medred-600 font-medium rounded-lg shadow-sm transition">Salvar Item</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="frontend/js/app.js"></script>
+</body>
+</html>
