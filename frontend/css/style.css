@@ -1,14 +1,4 @@
-/* ==========================================
-MEDKIT - ESTILOS CUSTOMIZADOS
-Nota: A maior parte do estilo é feita via Tailwind CSS no HTML.
-Estas são classes auxiliares do sistema.
-========================================== */
 
-/*
-Classe utilitária para ocultar telas (Dashboard, Estoque, Modal).
-O !important garante que o Tailwind não sobrescreva essa regra
-quando o JavaScript adicionar essa classe.
-*/
 .hidden-view {
     display: none !important;
     }

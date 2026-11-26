@@ -1,11 +1,80 @@
-const API_URL = 'http://localhost:3000/api/estoque';
+// ==========================================
+// 1. PROTEÇÃO DE ROTA E PERFIL DO MÉDICO LOGADO
+// ==========================================
+const loggedUserStr = sessionStorage.getItem('medkit_user');
 
-// Cache local sincronizado com a API
+if (!loggedUserStr) {
+    // Volta duas pastas (../../) até a raiz onde está o index.html
+    window.location.href = '../../index.html';
+}
+
+const currentUser = loggedUserStr ? JSON.parse(loggedUserStr) : null;
+const API_URL = 'http://localhost:3000/api';
+
+// Preenche os dados do médico na barra lateral ao carregar a página
+document.addEventListener('DOMContentLoaded', async () => {
+    if (currentUser) {
+        document.getElementById('user-name').innerText = currentUser.nome;
+        document.getElementById('user-role').innerText = currentUser.cargo_funcao || currentUser.especialidade || 'Médico';
+        
+        const parts = currentUser.nome.replace(/^Dr\.?\s|^Dra\.?\s/i, '').trim().split(' ');
+        const initials = parts.length > 1 
+            ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            : parts[0].substring(0, 2).toUpperCase();
+        document.getElementById('user-initials').innerText = initials;
+    }
+
+    // Carrega os 32 itens reais do banco de dados MySQL e inicia na Dashboard
+    await loadInventory();
+    switchTab('dashboard');
+});
+
+function handleLogout() {
+    sessionStorage.removeItem('medkit_user');
+    window.location.href = '../../index.html';
+}
+
+// ==========================================
+// 2. DADOS DO ESTOQUE (Integração com MySQL)
+// ==========================================
 let inventory = [];
 
-// ==========================================
-// MAPEAMENTO DE CATEGORIAS
-// ==========================================
+function showToast(message, isError = false) {
+    const msg = document.createElement('div');
+    msg.className = `fixed bottom-4 right-4 ${isError ? 'bg-red-600' : 'bg-green-500'} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity`;
+    msg.innerText = message;
+    document.body.appendChild(msg);
+    setTimeout(() => msg.remove(), 3500);
+}
+
+async function loadInventory() {
+    try {
+        const response = await fetch(`${API_URL}/estoque`);
+        if (!response.ok) {
+            throw new Error('Erro ao buscar itens do estoque.');
+        }
+
+        const data = await response.json();
+
+        // Normaliza datas (YYYY-MM-DD) e valores booleanos vindos do MySQL
+        inventory = data.map(item => ({
+            ...item,
+            qty: Number(item.qty),
+            minQty: Number(item.minQty ?? 10),
+            price: Number(item.price ?? 0),
+            expiration: item.expiration ? String(item.expiration).split('T')[0] : '',
+            cooling: Boolean(item.cooling),
+            generic: Boolean(item.generic)
+        }));
+
+        updateDashboard();
+        renderInventory();
+    } catch (error) {
+        console.error('Erro ao carregar estoque do MySQL:', error);
+        showToast('Erro ao carregar os itens do banco de dados.', true);
+    }
+}
+
 const subcategoriesMap = {
     'Medicamento': ['Controlados', 'Regulares', 'Uso Supervisionado'],
     'Anestésico': ['Restritos', 'Regulares'],
@@ -25,21 +94,21 @@ function updateSubcategories(selectedType = null) {
     const typeInput = document.getElementById('item-type');
     const typeOptions = document.getElementById('type-options');
     const selectedCategory = categorySelect.value;
-
-    if (typeOptions) typeOptions.innerHTML = '';
-
+    
+    if(typeOptions) typeOptions.innerHTML = '';
+    
     const labelType = document.getElementById('label-item-type');
-    if (labelType) {
-        if (selectedCategory === 'Medicamento') labelType.innerText = 'Controle do Medicamento *';
-        else if (selectedCategory === 'Anestésico') labelType.innerText = 'Classificação do Anestésico *';
-        else if (selectedCategory === 'Vacina') labelType.innerText = 'Público Alvo da Vacina *';
-        else if (selectedCategory === 'Equipamento') labelType.innerText = 'Tipo / Área do Equipamento *';
+    if(labelType) {
+        if(selectedCategory === 'Medicamento') labelType.innerText = 'Controle do Medicamento *';
+        else if(selectedCategory === 'Anestésico') labelType.innerText = 'Classificação do Anestésico *';
+        else if(selectedCategory === 'Vacina') labelType.innerText = 'Público Alvo da Vacina *';
+        else if(selectedCategory === 'Equipamento') labelType.innerText = 'Tipo / Área do Equipamento *';
         else labelType.innerText = 'Subcategoria *';
     }
 
     const options = subcategoriesMap[selectedCategory] || [];
-
-    if (typeOptions) {
+    
+    if(typeOptions) {
         options.forEach(opt => {
             const optionEl = document.createElement('option');
             optionEl.value = opt;
@@ -47,16 +116,11 @@ function updateSubcategories(selectedType = null) {
         });
     }
 
-    if (typeInput) {
-        if (typeof selectedType === 'string') {
-            typeInput.value = selectedType;
-        } else {
-            typeInput.value = '';
-        }
+    if(typeInput) {
+        typeInput.value = (typeof selectedType === 'string') ? selectedType : '';
     }
 }
 
-// Lógica de Vencimento
 const hoje = new Date();
 const trintaDias = new Date();
 trintaDias.setDate(hoje.getDate() + 30);
@@ -65,7 +129,7 @@ function checkStatus(item) {
     let statuses = [];
     if (item.qty === 0) statuses.push({ label: 'Em Falta', color: 'bg-red-100 text-red-700' });
     else if (item.qty <= item.minQty) statuses.push({ label: 'Estoque Baixo', color: 'bg-yellow-100 text-yellow-700' });
-
+    
     if (item.expiration) {
         const expDate = new Date(item.expiration);
         if (expDate < hoje) statuses.push({ label: 'Vencido', color: 'bg-red-600 text-white' });
@@ -76,58 +140,13 @@ function checkStatus(item) {
     return statuses;
 }
 
-// Notificação flutuante reutilizável
-function showToast(message, isError = false) {
-    const msg = document.createElement('div');
-    msg.className = `fixed bottom-4 right-4 ${isError ? 'bg-red-600' : 'bg-green-500'} text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity`;
-    msg.innerText = message;
-    document.body.appendChild(msg);
-    setTimeout(() => msg.remove(), 3000);
-}
-
 // ==========================================
-// INTEGRAÇÃO COM A API (GET)
+// 3. NAVEGAÇÃO ENTRE ABAS
 // ==========================================
-async function fetchInventory() {
-    try {
-        const response = await fetch(API_URL);
-        if (!response.ok) {
-            throw new Error('Falha ao buscar itens do estoque');
-        }
-        inventory = await response.json();
-        updateDashboard();
-        renderInventory();
-    } catch (error) {
-        console.error('Erro ao carregar estoque:', error);
-        showToast('Erro ao conectar com o servidor em localhost:3000', true);
-    }
-}
-
-// ==========================================
-// CONTROLE DE TELAS (Navegação)
-// ==========================================
-async function handleLogin(event) {
-    event.preventDefault();
-
-    document.getElementById('login-view').classList.add('hidden-view');
-    document.getElementById('sidebar').classList.remove('hidden-view');
-    document.getElementById('main-content').classList.remove('hidden-view');
-
-    switchTab('dashboard');
-    await fetchInventory();
-}
-
-function handleLogout() {
-    document.getElementById('login-view').classList.remove('hidden-view');
-    document.getElementById('sidebar').classList.add('hidden-view');
-    document.getElementById('main-content').classList.add('hidden-view');
-    document.getElementById('login-form').reset();
-}
-
-async function switchTab(tabId) {
+function switchTab(tabId) {
     document.getElementById('view-dashboard').classList.add('hidden-view');
     document.getElementById('view-inventory').classList.add('hidden-view');
-
+    
     document.querySelectorAll('.nav-btn').forEach(btn => {
         btn.classList.remove('text-medred-600', 'bg-red-50');
         btn.classList.add('text-gray-600', 'hover:bg-gray-100');
@@ -149,13 +168,13 @@ async function switchTab(tabId) {
 }
 
 // ==========================================
-// LÓGICA DO DASHBOARD
+// 4. LÓGICA DO DASHBOARD
 // ==========================================
 function updateDashboard() {
     const total = inventory.length;
     const lowStock = inventory.filter(i => i.qty <= i.minQty).length;
     const expiring = inventory.filter(i => {
-        if (!i.expiration) return false;
+        if(!i.expiration) return false;
         const d = new Date(i.expiration);
         return d <= trintaDias;
     }).length;
@@ -165,19 +184,19 @@ function updateDashboard() {
     document.getElementById('dash-expiring').innerText = expiring;
 
     const tbody = document.getElementById('alerts-table-body');
-    if (!tbody) return;
-
+    if(!tbody) return;
+    
     tbody.innerHTML = '';
-
+    
     let alertItems = inventory.filter(i => checkStatus(i).some(s => s.label !== 'Normal'));
-
+    
     if (alertItems.length === 0) {
         tbody.innerHTML = `<tr><td colspan="3" class="py-4 text-center text-gray-500">Nenhum alerta no momento.</td></tr>`;
     } else {
         alertItems.forEach(item => {
             let statuses = checkStatus(item).filter(s => s.label !== 'Normal');
             let statusTags = statuses.map(s => `<span class="text-xs font-semibold px-2 py-1 rounded-full ${s.color}">${s.label}</span>`).join(' ');
-
+            
             let tr = document.createElement('tr');
             tr.className = "border-b border-gray-100 last:border-0";
             tr.innerHTML = `
@@ -193,14 +212,14 @@ function updateDashboard() {
 }
 
 // ==========================================
-// LÓGICA DO ESTOQUE (Tabela, Filtros e PESQUISA)
+// 5. LÓGICA DO ESTOQUE (Tabela, Filtros e Pesquisa)
 // ==========================================
 const filterCategory = document.getElementById('filter-category');
-if (filterCategory) {
-    filterCategory.addEventListener('change', function () {
+if(filterCategory) {
+    filterCategory.addEventListener('change', function() {
         const cat = this.value;
         const subFilter = document.getElementById('filter-subcategory');
-
+        
         if (cat === 'all') {
             subFilter.classList.add('hidden-view');
             subFilter.value = 'all';
@@ -220,8 +239,8 @@ if (filterCategory) {
 
 function renderInventory() {
     const tbody = document.getElementById('inventory-table-body');
-    if (!tbody) return;
-
+    if(!tbody) return;
+    
     tbody.innerHTML = '';
 
     const searchFilter = document.getElementById('search-item') ? document.getElementById('search-item').value.toLowerCase() : '';
@@ -233,7 +252,7 @@ function renderInventory() {
         let passSearch = searchFilter === '' || item.name.toLowerCase().includes(searchFilter);
         let passCat = catFilter === 'all' || item.category === catFilter;
         let passSub = subFilter === 'all' || (item.type && item.type.toLowerCase() === subFilter.toLowerCase());
-
+        
         let passStatus = true;
         if (statusFilter === 'low') passStatus = item.qty <= item.minQty;
         if (statusFilter === 'expiring') {
@@ -256,19 +275,20 @@ function renderInventory() {
     filtered.forEach(item => {
         let statuses = checkStatus(item);
         let statusHtml = statuses.map(s => `<span class="inline-block text-xs font-semibold px-2 py-1 rounded-full ${s.color} mb-1">${s.label}</span>`).join('<br>');
-
+        
         let dateStr = '-';
-        if (item.expiration) {
+        if(item.expiration) {
             const [y, m, d] = item.expiration.split('-');
             dateStr = `${d}/${m}/${y}`;
         }
 
         let iconCooling = item.cooling ? '<i class="fa-solid fa-snowflake text-blue-400 ml-2" title="Requer Resfriamento"></i>' : '';
+        let badgeGeneric = item.generic ? '<span class="ml-2 text-[10px] uppercase bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded font-semibold">Genérico</span>' : '';
 
         let tr = document.createElement('tr');
         tr.innerHTML = `
             <td class="py-3 px-6">
-                <p class="font-bold text-gray-800">${item.name} ${iconCooling}</p>
+                <p class="font-bold text-gray-800">${item.name} ${iconCooling} ${badgeGeneric}</p>
             </td>
             <td class="py-3 px-6 text-sm text-gray-600">
                 ${item.category} <span class="text-xs text-gray-400 block">${item.type}</span>
@@ -286,26 +306,23 @@ function renderInventory() {
 }
 
 // ==========================================
-// LÓGICA DO CRUD (Modal + API)
+// 6. LÓGICA DO CRUD (Modal)
 // ==========================================
 function openModal(id = null) {
     document.getElementById('item-modal').classList.remove('hidden-view');
-
+    
     if (id) {
         document.getElementById('modal-title').innerText = 'Editar Item';
         const item = inventory.find(i => i.id === id);
-        if (!item) return;
-
         document.getElementById('item-id').value = item.id;
         document.getElementById('item-name').value = item.name;
         document.getElementById('item-category').value = item.category;
-
         updateSubcategories(item.type);
-
         document.getElementById('item-qty').value = item.qty;
-        document.getElementById('item-expiration').value = item.expiration ? item.expiration.slice(0, 10) : '';
+        document.getElementById('item-expiration').value = item.expiration;
         document.getElementById('item-price').value = item.price;
-        document.getElementById('item-cooling').checked = Boolean(item.cooling);
+        document.getElementById('item-cooling').checked = item.cooling;
+        document.getElementById('item-generic').checked = item.generic || false;
     } else {
         document.getElementById('modal-title').innerText = 'Cadastrar Novo Item';
         document.getElementById('item-form').reset();
@@ -320,23 +337,24 @@ function closeModal() {
 
 async function saveItem(event) {
     event.preventDefault();
-
+    
     const id = document.getElementById('item-id').value;
-    const existingItem = id ? inventory.find(i => i.id === Number(id)) : null;
+    const existingItem = id ? inventory.find(i => i.id === parseInt(id)) : null;
 
     const payload = {
         name: document.getElementById('item-name').value.trim(),
         category: document.getElementById('item-category').value,
-        qty: parseInt(document.getElementById('item-qty').value, 10),
-        minQty: existingItem ? existingItem.minQty : 10,
-        expiration: document.getElementById('item-expiration').value,
-        price: parseFloat(document.getElementById('item-price').value) || 0,
         type: document.getElementById('item-type').value.trim(),
-        cooling: document.getElementById('item-cooling').checked
+        qty: parseInt(document.getElementById('item-qty').value),
+        minQty: existingItem ? existingItem.minQty : 10,
+        expiration: document.getElementById('item-expiration').value || null,
+        price: parseFloat(document.getElementById('item-price').value) || 0,
+        cooling: document.getElementById('item-cooling').checked,
+        generic: document.getElementById('item-generic').checked
     };
 
     try {
-        const url = id ? `${API_URL}/${id}` : API_URL;
+        const url = id ? `${API_URL}/estoque/${id}` : `${API_URL}/estoque`;
         const method = id ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
@@ -345,30 +363,20 @@ async function saveItem(event) {
             body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || 'Erro ao salvar item');
-        }
-
-        if (id) {
-            const index = inventory.findIndex(i => i.id === Number(id));
-            if (index !== -1) inventory[index] = data;
-        } else {
-            inventory.push(data);
+            throw new Error('Falha ao salvar item no banco de dados.');
         }
 
         closeModal();
-
         if (document.getElementById('search-item')) {
             document.getElementById('search-item').value = '';
         }
 
-        renderInventory();
-        updateDashboard();
-        showToast('Item salvo com sucesso!');
+        await loadInventory();
+        showToast('Item salvo com sucesso no banco de dados!');
     } catch (error) {
         console.error('Erro ao salvar item:', error);
-        showToast(error.message || 'Erro ao comunicar com o servidor', true);
+        showToast('Erro ao salvar item no servidor.', true);
     }
 }
 
@@ -395,24 +403,21 @@ function deleteItem(id) {
     document.getElementById('cancel-del').onclick = () => confirmBox.remove();
     document.getElementById('confirm-del').onclick = async () => {
         try {
-            const response = await fetch(`${API_URL}/${id}`, {
+            const response = await fetch(`${API_URL}/estoque/${id}`, {
                 method: 'DELETE'
             });
 
-            const data = await response.json();
             if (!response.ok) {
-                throw new Error(data.error || 'Erro ao excluir item');
+                throw new Error('Falha ao excluir item no banco de dados.');
             }
 
-            inventory = inventory.filter(i => i.id !== id);
-            renderInventory();
-            updateDashboard();
+            await loadInventory();
             confirmBox.remove();
-            showToast('Item removido com sucesso!');
+            showToast('Item excluído com sucesso!');
         } catch (error) {
             console.error('Erro ao excluir item:', error);
             confirmBox.remove();
-            showToast(error.message || 'Erro ao comunicar com o servidor', true);
+            showToast('Erro ao excluir item no servidor.', true);
         }
     };
 }
